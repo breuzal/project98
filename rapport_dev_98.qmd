@@ -1,0 +1,219 @@
+---
+title : "Création/mise en place du 98"
+engine : julia
+author : "Matthias MAZET"
+format : html
+---
+# *I. Création des cartes*
+```{julia}
+struct Carte 
+    rang :: Int64
+    couleur :: Int64 
+    function Carte(rang::Int64, couleur::Int64) 
+        @assert(1 ≤ rang ≤ 13, "problème de rang")
+        @assert(1 ≤ couleur ≤ 4, "problème de couleur")
+    new(rang, couleur)
+    end 
+end
+```
+Créer une structure de carte renseignée par un couple d'entiers.  
+@assert : permet d'imposer une condition sur les valeurs prises par les arguments.  
+new : créer la carte si les conditions sont remplies.  
+Cette structure permet de classifier les  cartes => pouvoir les comparer.
+\
+
+```{julia}
+rangs = (:As, 2, 3, 4, 5, 6, 7, 8 , 9, 10, :V, :D, :R)
+couleurs = (:♥, :♦, :♠, :♣)
+
+function Base.show(io::IO, carte::Carte)
+   print(io, rangs[carte.rang], couleurs[carte.couleur])
+end
+```
+Base.show : fonction show de base (au cas où elle est modifiée ailleurs).  
+io :: IO : multiple dispatching : permet de gérer l'affichage automatiquement.  
+io (dans print) : associer le show et le print.  
+Cette fonction permet d'associer la structure de la carte à sa "vraie" valeur.  
+\  
+
+Test pour visualiser[^1] :
+```{julia}
+# Test :
+Carte(12,1)
+typeof(Carte(12,1))
+```
+[^1]: Problème d'affichage sur le pdf.
+
+{{< pagebreak >}}
+
+# *II. Création du paquet de cartes*
+```{julia}
+struct Paquet 
+    cartes :: Array{Carte, 1} 
+end
+```
+Créer une structure pour le paquet de cartes.  
+\
+
+```{julia}
+function Paquet52() 
+    paquet = Paquet(Carte[])
+    for couleur in 1:4 
+# Sélectionne la couleur de la carte.
+        for rang in 1:13 
+# Sélectionne le rang de la carte.
+            push!(paquet.cartes, Carte(rang, couleur)) 
+# push! : ajoute le couple carte sélectionné à la liste de cartes du paquet.
+        end
+    end
+    paquet
+end
+```
+Le *paquet* est complet mais s'affiche sous forme d'une liste de *cartes*.  
+\ 
+
+```{julia}
+function Base.show(io::IO, paquet::Paquet) 
+    for carte in paquet.cartes
+        print(io, carte, " ")
+    end
+    println()
+end
+```
+Cette fonction permet de créer un affichage pour les *cartes* de la liste stocker dans le *paquet*.  
+Le *paquet* s'affiche donc maintenant comme des *cartes* séparées.
+\ 
+
+{{< pagebreak >}}
+
+# *III. Effets sur le paquet*
+## *1. Mélanger le paquet*
+```{julia}
+using Random
+function Random.shuffle!(paquet::Paquet)
+    shuffle!(paquet.cartes)
+    paquet
+end
+```
+Importe et formate la fonction "shuffle!" pour l'adapter à la structure "Paquet".  
+Cette fonction permet ainsi de mélanger un *paquet* de carte. 
+\
+
+Test pour voir la différence[^1] :
+```{julia}
+paquet = Paquet52()
+pile = shuffle!(Paquet52())
+```
+La *pile* correspond au *paquet* mélangé.
+\ 
+
+## *2. Sortir une carte*
+```{julia}
+function Base.pop!(paquet::Paquet) 
+    pop!(paquet.cartes)
+end
+```
+Importe et formate la fonction "pop!" pour l'adapter à la structure "Paquet".  
+Cette fonction permet de retirer la dernière carte du *paquet* et de la stocker.  
+\ 
+
+## *3. Supprimer une carte à un endroit donné*
+```{julia}
+function Base.splice!(paquet::Paquet, index::Int64)
+    splice!(paquet.cartes, index)
+end
+```
+Importe et formate la fonction "splice!" pour l'adapter à la structure "Paquet".  
+Cette fonction permet de supprimer la carte à la place *index* du *paquet*.
+\
+
+## *4. Ajouter une carte*
+```{julia}
+function Base.push!(paquet::Paquet, carte::Carte) 
+    push!(paquet.cartes, carte)
+    paquet 
+end
+```
+Importe et formate la fonction "push!" pour l'adapter aux structures "Paquet" et "Carte".  
+Rajoute une *carte* à la fin de *paquet* sélectionné.
+
+Exemple[^1] :
+```{julia}
+tirage = pop!(pile)
+recomp = push!(pile, tirage)
+print("Recomposition = ", recomp)
+```
+La *carte* tirée a été remise à la fin de la *pile* (à la place où elle a été tiré).  
+\ 
+
+
+## *5. Créer les mains des joueurs en début de partie*
+```{julia}
+function distribution(paquet::Paquet, joueur::Paquet)
+    for i in 1:5
+        joueur = push!(joueur, pop!(paquet))
+    end
+    joueur
+end
+```
+La fonction transfert 5 cartes d'un *paquet* à un *joueur* (qui a une structure "Paquet") et retourne la main du joueur. A la fin de la fonction, les 5 dernières cartes du *paquet* n'apparaissent donc plus dans celui-ci (puisqu'elles sont dans la main du joueur).
+Le reste du *paquet* peut alors servir de pioche.  
+\ 
+
+Exemple[^1] :
+```{julia}
+paquet = shuffle!(Paquet52())
+length(paquet.cartes)
+joueur1 = Paquet(Carte[])
+joueur2 = Paquet(Carte[])
+joueur3 = Paquet(Carte[])
+joueur4 = Paquet(Carte[])
+joueur1 = distribution(paquet, joueur1)
+joueur2 = distribution(paquet, joueur2)
+joueur3 = distribution(paquet, joueur3)
+joueur4 = distribution(paquet, joueur4)
+length(paquet.cartes)
+```
+Les *joueurs* sont créés au préalable afin d'obtenir des *paquets* vides et de pouvoir ainsi les remplir de *cartes*.
+Grâce à la fonction "length", on constate bien que le *paquet* initiale a perdu $20 = 4*5$ *cartes*.  
+\
+Pour appeler la i-ème *carte* d'un *paquet*, on utilise l'instruction "paquet.cartes[i]".  
+Par exemple[^1] : 
+```{julia}
+joueur1.cartes[1]
+# Permet d'appeler la première carte du joueur1.
+```
+\
+
+
+## *5. Actions des cartes sur le compteur*
+```{julia}
+function jouer(compteur, carte::Carte)
+    rg = carte.rang
+    if 1 <= rg <= 10
+        compteur += rg
+    elseif rg == 11
+        compteur += 0
+    elseif rg == 12
+        compteur -= 10
+    elseif rg == 13
+        compteur = 70
+    end
+end
+```
+Cette fonction permet d'attribuer une action à chaque carte.
+\
+Test :
+```{julia}
+paquet = Paquet52()
+joueur = Paquet(Carte[])
+joueur = distribution(paquet, joueur)
+compteur = 0
+compteur = jouer(compteur, joueur.cartes[5])
+compteur
+joueur
+compteur = jouer(compteur, joueur.cartes[4])
+compteur = jouer(compteur, joueur.cartes[1])
+compteur = jouer(compteur, joueur.cartes[2])
+compteur = jouer(compteur, joueur.cartes[3])
+```
